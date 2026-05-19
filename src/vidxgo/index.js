@@ -3,15 +3,8 @@ const IS_SERVER = typeof process !== 'undefined' && process.versions && process.
 if (!IS_SERVER) {
   module.exports = {
     getStreams: async (id, type, season, episode) => {
-      try {
-        const url = `https://easystreams.realbestia.com/resolve/vidxgo?id=${id}&type=${type}&s=${season || 1}&ep=${episode || 1}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        return data.streams || [];
-      } catch (e) {
-        console.error('[VidxGo-Client] API Error:', e.message);
-        return [];
-      }
+      console.warn('[VidxGo-Client] Disabled: VidXGo requires EasyProxy stream proxy.');
+      return [];
     }
   };
 } else {
@@ -201,10 +194,25 @@ if (!IS_SERVER) {
         const vidxgoUrl = isMovie
           ? `https://v.vidxgo.co/${numericId}`
           : `https://v.vidxgo.co/${numericId}/${effectiveSeason}/${effectiveEpisode}`;
-        const vidxgoStream = yield extractVidxGo(vidxgoUrl, 'https://altadefinizione.you/');
+
+        const shouldUseEasyProxy = Boolean(providerContext && providerContext.proxyUrl);
+        let vidxgoStream = null;
+
+        if (shouldUseEasyProxy) {
+          vidxgoStream = {
+            url: vidxgoUrl,
+            easyProxySourceUrl: vidxgoUrl,
+            headers: null
+          };
+        } else {
+          vidxgoStream = yield extractVidxGo(vidxgoUrl, 'https://altadefinizione.you/');
+        }
+
         if (vidxgoStream && vidxgoStream.url) {
           let quality = "HD";
-          const detectedQuality = yield checkQualityFromPlaylist(vidxgoStream.url, vidxgoStream.headers);
+          const detectedQuality = shouldUseEasyProxy
+            ? null
+            : yield checkQualityFromPlaylist(vidxgoStream.url, vidxgoStream.headers);
           if (detectedQuality) quality = detectedQuality;
           streams.push({
             url: vidxgoStream.url,

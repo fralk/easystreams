@@ -345,13 +345,14 @@ var require_formatter = __commonJS({
         stream == null ? void 0 : stream.server,
         providerName
       ].filter(Boolean).join(" ").toLowerCase();
-      if (text.includes("mixdrop") || text.includes("m1xdrop") || text.includes("mxcontent")) {
-        return true;
-      }
       if (text.includes("loadm") || text.includes("loadm.cam")) {
         return true;
       }
       return false;
+    }
+    function normalizeProviderId(providerName) {
+      const normalized = String(providerName || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+      return normalized || void 0;
     }
     function formatStream(stream, providerName) {
       let quality = stream.quality || "";
@@ -410,6 +411,8 @@ var require_formatter = __commonJS({
       let finalTitle = `\u{1F4C1} ${stream.title || "Stream"}`;
       if (desc) finalTitle += ` | ${desc}`;
       if (language) finalTitle += ` | ${language}`;
+      const playbackReferer = stream.referer || (finalHeaders == null ? void 0 : finalHeaders.Referer) || (finalHeaders == null ? void 0 : finalHeaders.referer);
+      const playbackUserAgent = stream.userAgent || (finalHeaders == null ? void 0 : finalHeaders["User-Agent"]) || (finalHeaders == null ? void 0 : finalHeaders["user-agent"]);
       return __spreadProps(__spreadValues({}, stream), {
         // Keep original properties
         name: finalName,
@@ -424,6 +427,9 @@ var require_formatter = __commonJS({
         // Mark as formatted
         _nuvio_formatted: true,
         behaviorHints,
+        provider: stream.provider || normalizeProviderId(providerName),
+        referer: playbackReferer,
+        userAgent: playbackUserAgent,
         // Explicitly ensure root headers are preserved for Nuvio
         headers: finalHeaders
       });
@@ -437,15 +443,8 @@ var IS_SERVER = typeof process !== "undefined" && process.versions && process.ve
 if (!IS_SERVER) {
   module.exports = {
     getStreams: (id, type, season, episode) => __async(null, null, function* () {
-      try {
-        const url = `https://easystreams.realbestia.com/resolve/vidxgo?id=${id}&type=${type}&s=${season || 1}&ep=${episode || 1}`;
-        const response = yield fetch(url);
-        const data = yield response.json();
-        return data.streams || [];
-      } catch (e) {
-        console.error("[VidxGo-Client] API Error:", e.message);
-        return [];
-      }
+      console.warn("[VidxGo-Client] Disabled: VidXGo requires EasyProxy stream proxy.");
+      return [];
     })
   };
 } else {
@@ -608,10 +607,20 @@ if (!IS_SERVER) {
         const displayName = isMovie ? contentTitle : `${contentTitle} ${effectiveSeason}x${effectiveEpisode}`;
         const streams = [];
         const vidxgoUrl = isMovie ? `https://v.vidxgo.co/${numericId}` : `https://v.vidxgo.co/${numericId}/${effectiveSeason}/${effectiveEpisode}`;
-        const vidxgoStream = yield extractVidxGo(vidxgoUrl, "https://altadefinizione.you/");
+        const shouldUseEasyProxy = Boolean(providerContext && providerContext.proxyUrl);
+        let vidxgoStream = null;
+        if (shouldUseEasyProxy) {
+          vidxgoStream = {
+            url: vidxgoUrl,
+            easyProxySourceUrl: vidxgoUrl,
+            headers: null
+          };
+        } else {
+          vidxgoStream = yield extractVidxGo(vidxgoUrl, "https://altadefinizione.you/");
+        }
         if (vidxgoStream && vidxgoStream.url) {
           let quality = "HD";
-          const detectedQuality = yield checkQualityFromPlaylist(vidxgoStream.url, vidxgoStream.headers);
+          const detectedQuality = shouldUseEasyProxy ? null : yield checkQualityFromPlaylist(vidxgoStream.url, vidxgoStream.headers);
           if (detectedQuality) quality = detectedQuality;
           streams.push({
             url: vidxgoStream.url,
