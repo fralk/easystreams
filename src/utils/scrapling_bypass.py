@@ -54,11 +54,10 @@ def main():
         fetch_kwargs['useragent'] = user_agent
 
     try:
-        fetcher = StealthyFetcher()
         if args.method.upper() == 'POST':
-            response = fetcher.fetch(args.url, method='POST', body=args.data, **fetch_kwargs)
+            response = StealthyFetcher.fetch(args.url, method='POST', body=args.data, **fetch_kwargs)
         else:
-            response = fetcher.fetch(args.url, **fetch_kwargs)
+            response = StealthyFetcher.fetch(args.url, **fetch_kwargs)
 
         # Small extra wait to ensure cookies from late JS execution are captured
         import time
